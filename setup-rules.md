@@ -9,6 +9,8 @@
 - SU-03 점검기는 셋업 전에 한 번 실행해 FAIL 이 나오는지 확인한다. FAIL 이 하나도 없으면 점검기가 아무것도 확인하지 않는 것이다
 - SU-04 프로젝트 README 가 「고치지 않는다」고 정한 폴더 · 파일은 고치지 않는다. 빌드가 안 되면 고치지 말고 멈춰서 보고한다
 - SU-05 내려받기가 사내망에서 막히거나 회사 정책이 스크립트 실행을 막으면 우회하지 말고 멈춰서 보고한다
+- SU-26 계획의 Goal 문장은 요청에서 받은 목표까지만 잡는다. 목표를 넘는 일은 계획 「다음에 할 것」 절에 두고 내가 고르기 전에는 하지 않는다. 실행 중에 내가 정할 것은 실행 전에 묻고, 실행 중에만 할 수 있는 내 일은 단계 안에 「멈춤 지점」으로 적는다
+- SU-27 「…가 없다」를 확인하는 점검 항목은 찾는 값이 든 입력으로 한 번 FAIL 이 나는지 시험한다. 점검기가 읽는 파일의 인코딩(UTF-16 · UTF-8)이 점검기가 읽는 방식과 같은지 연다 — Windows PowerShell 5.1 의 `Tee-Object` 는 UTF-16 으로 써서 UTF-8 로 읽으면 SEVERE 를 못 찾고 PASS 가 난다
 
 ## 컴파일러
 
@@ -28,6 +30,8 @@
 
 - SU-14 빌드 산출물(`*.o` · `*.exe` · `test-results/`)과 Jenkins 실행 파일 · Jenkins 홈은 저장소에 넣지 않는다
 - SU-15 내 저장소는 팀 원본 템플릿에서 만든다(GitHub **Use this template** · Private). 빈 저장소를 만들어 파일을 옮겨 오지 않는다
+- SU-24 개인 무료 계정의 Private 저장소는 GitHub 브랜치 보호를 켤 수 없다(API 403). `main` 직접 push 금지는 `.claude/settings.json` 권한과 CLAUDE.md 규칙으로 두고, PR 체크가 빨강이어도 병합 버튼은 눌린다는 것을 알고 병합한다
+- SU-25 Windows Git 은 꺼낼 때 줄바꿈을 CRLF 로 바꾼다(`core.autocrlf=true` 기본). 들인 파일이 팀 원본과 같은지는 줄바꿈까지 같은지로 확인한다
 
 ## Jenkins
 
@@ -39,3 +43,12 @@
 - SU-21 받은 플러그인 파일 수가 `jenkins-plugins.txt` 줄 수와 같은지 확인하고, 빠진 것만 다시 받는다. 여러 개를 동시에 받으면 일부가 순간 실패한다
 - SU-22 Jenkins 를 띄운 뒤 활성 플러그인 수가 목록 수와 같고 로그에 SEVERE 가 없는지 확인한다. 플러그인이 빠진 채 띄우면 job 이 보이지 않는 것 말고는 화면에 실패가 드러나지 않는다
 - SU-23 설치 마법사를 끄고 띄운 Jenkins 는 로그인 없이 열린다. `127.0.0.1` 에서만 열고 다른 주소로 열지 않는다
+
+## GitHub Actions · 러너
+
+- SU-28 self-hosted 러너는 내 저장소에 Windows x64 로 등록하고, PR 검수가 도는 동안 러너를 띄운 내 창을 열어 둔다. 창이 닫히면 job 이 `Queued` 에서 멈춘다
+- SU-29 러너를 끄고 다시 켠 직후 2 ~ 3분은 `A session for this runner already exists` 가 나고, 그사이 다시 실행한 job 은 `Queued` 로 남는다. 그 job 은 취소한 뒤 다시 실행한다
+- SU-30 러너에서 쓰는 Claude Code 는 그 PC 에 로그인된 것을 그대로 쓴다. API 키 · 개인 토큰을 저장소나 시크릿에 두지 않고, PR 에 코멘트를 다는 토큰은 `github.token` 이다
+- SU-31 PR 에 결과 코멘트 · 인라인 코멘트를 다는 workflow 는 `permissions` 에 `pull-requests: write` 와 `issues: write` 를 적는다
+- SU-32 workflow 를 Windows `cmd` 셸로 돌리며 Python 이 한글을 출력하면 그 단계 `env` 에 `PYTHONIOENCODING: utf-8` 을 둔다
+- SU-33 workflow 에 `paths` 를 걸면 그 경로의 파일을 바꾸지 않은 PR 에서는 workflow 가 돌지 않는다. 검수가 돌았는지는 PR 의 Checks 에 그 workflow 가 있는지로 확인한다
