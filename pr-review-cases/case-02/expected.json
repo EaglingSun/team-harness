@@ -1,0 +1,20 @@
+{
+  "case": "case-02",
+  "summary": "범위를 확인하지 않는 인덱스로 버퍼를 읽는 새 함수",
+  "rule_broken": "CR-02",
+  "expected_verdict": "FAIL",
+  "gate": "G2",
+  "spare": false,
+  "base": "예제 코드 템플릿 main + 요구사항 v2",
+  "findings": [
+    {
+      "rule": "CR-02",
+      "severity": "high",
+      "file": "src/sensor_filter.c",
+      "lines": [
+        47,
+        50
+      ]
+    }
+  ]
+}

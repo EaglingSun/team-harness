@@ -1,0 +1,29 @@
+{
+  "case": "case-07",
+  "summary": "(예비) extern 없이 .c 파일 범위에 static 이 아닌 모듈 상태를 둠",
+  "rule_broken": "CR-03",
+  "expected_verdict": "PASS",
+  "gate": "G3",
+  "spare": true,
+  "base": "예제 코드 템플릿 main + 요구사항 v2",
+  "findings": [
+    {
+      "rule": "CR-03",
+      "severity": "medium",
+      "file": "src/sensor_filter.c",
+      "lines": [
+        47,
+        47
+      ],
+      "also": [
+        {
+          "file": "src/sensor_filter.c",
+          "lines": [
+            53,
+            53
+          ]
+        }
+      ]
+    }
+  ]
+}

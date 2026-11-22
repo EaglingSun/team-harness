@@ -1,0 +1,38 @@
+diff --git a/include/speed_monitor.h b/include/speed_monitor.h
+index 598a7cc..81255a1 100644
+--- a/include/speed_monitor.h
++++ b/include/speed_monitor.h
+@@ -14,4 +14,7 @@ void sm_reset(uint16_t ecu_id);
+ /* 누적 과속 횟수를 반환한다 */
+ uint32_t sm_over_count(void);
+ 
++/* 판정 주기를 알려 준다 */
++uint16_t sm_period_ms(uint16_t ecu_id);
++
+ #endif /* VSM_SPEED_MONITOR_H */
+diff --git a/include/vsm_types.h b/include/vsm_types.h
+index 53d7bb5..650c935 100644
+--- a/include/vsm_types.h
++++ b/include/vsm_types.h
+@@ -27,4 +27,7 @@ typedef enum
+ /* 주의 경고 기준 (SR-003) */
+ #define VSM_SPEED_CAUTION_KPH 150u
+ 
++/* 판정 주기 */
++#define VSM_PERIOD_MS       10u
++
+ #endif /* VSM_TYPES_H */
+diff --git a/src/speed_monitor.c b/src/speed_monitor.c
+index aa35202..6ee5000 100644
+--- a/src/speed_monitor.c
++++ b/src/speed_monitor.c
+@@ -52,3 +52,9 @@ uint32_t sm_over_count(void)
+ {
+     return s_over_count;
+ }
++
++/* 판정 주기를 알려 준다. 지금은 대상 ECU 와 관계없이 같은 값이다 */
++uint16_t sm_period_ms(uint16_t ecu_id)
++{
++    return (uint16_t)VSM_PERIOD_MS;
++}

@@ -1,0 +1,26 @@
+diff --git a/include/sensor_filter.h b/include/sensor_filter.h
+index a8a0407..f3daea1 100644
+--- a/include/sensor_filter.h
++++ b/include/sensor_filter.h
+@@ -14,4 +14,7 @@ void sf_push(int16_t value);
+ /* 가장 최근 적재된 값을 반환한다 */
+ int16_t sf_latest(void);
+ 
++/* 평균을 구할 수 있는 샘플 개수인지 알려 준다 */
++bool sf_count_ok(uint8_t count);
++
+ #endif /* VSM_SENSOR_FILTER_H */
+diff --git a/src/sensor_filter.c b/src/sensor_filter.c
+index 479d882..cea494b 100644
+--- a/src/sensor_filter.c
++++ b/src/sensor_filter.c
+@@ -42,3 +42,9 @@ int16_t sf_average(const int16_t *samples, uint8_t count)
+ 
+     return avg;
+ }
++
++/* 평균을 구할 수 있는 샘플 개수인지 알려 준다 */
++bool sf_count_ok(uint8_t count)
++{
++    return (count >= 1u) && (count <= VSM_SAMPLE_MAX);
++}

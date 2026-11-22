@@ -1,0 +1,20 @@
+{
+  "case": "case-01",
+  "summary": "주의 기준을 숫자 리터럴로 쓴 새 함수",
+  "rule_broken": "CR-01",
+  "expected_verdict": "PASS",
+  "gate": "G3",
+  "spare": false,
+  "base": "예제 코드 템플릿 main + 요구사항 v2",
+  "findings": [
+    {
+      "rule": "CR-01",
+      "severity": "low",
+      "file": "src/speed_monitor.c",
+      "lines": [
+        57,
+        60
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "case": "case-03",
+  "summary": "헤더에 extern 전역 변수를 선언",
+  "rule_broken": "CR-03",
+  "expected_verdict": "PASS",
+  "gate": "G3",
+  "spare": false,
+  "base": "예제 코드 템플릿 main + 요구사항 v2",
+  "findings": [
+    {
+      "rule": "CR-03",
+      "severity": "medium",
+      "file": "include/speed_monitor.h",
+      "lines": [
+        18,
+        18
+      ],
+      "also": [
+        {
+          "file": "src/speed_monitor.c",
+          "lines": [
+            57,
+            57
+          ]
+        }
+      ]
+    }
+  ]
+}

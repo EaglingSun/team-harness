@@ -1,0 +1,10 @@
+{
+  "case": "case-06",
+  "summary": "팀 코딩 규칙을 모두 지킨 새 함수(오탐 확인)",
+  "rule_broken": null,
+  "expected_verdict": "PASS",
+  "gate": "G3",
+  "spare": false,
+  "base": "예제 코드 템플릿 main + 요구사항 v2",
+  "findings": []
+}

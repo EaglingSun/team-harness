@@ -1,0 +1,20 @@
+{
+  "case": "case-04",
+  "summary": "SR-008 의 개수 조건을 구현하면서 요구사항 번호 주석이 없음",
+  "rule_broken": "CR-04",
+  "expected_verdict": "PASS",
+  "gate": "G3",
+  "spare": false,
+  "base": "예제 코드 템플릿 main + 요구사항 v2",
+  "findings": [
+    {
+      "rule": "CR-04",
+      "severity": "low",
+      "file": "src/sensor_filter.c",
+      "lines": [
+        47,
+        50
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+diff --git a/include/sensor_filter.h b/include/sensor_filter.h
+index a8a0407..d211065 100644
+--- a/include/sensor_filter.h
++++ b/include/sensor_filter.h
+@@ -14,4 +14,7 @@ void sf_push(int16_t value);
+ /* 가장 최근 적재된 값을 반환한다 */
+ int16_t sf_latest(void);
+ 
++/* 센서 값을 적재하고 적재 개수를 센다 (SR-004) */
++void sf_push_counted(int16_t value);
++
+ #endif /* VSM_SENSOR_FILTER_H */
+diff --git a/src/sensor_filter.c b/src/sensor_filter.c
+index 479d882..df8101c 100644
+--- a/src/sensor_filter.c
++++ b/src/sensor_filter.c
+@@ -42,3 +42,13 @@ int16_t sf_average(const int16_t *samples, uint8_t count)
+ 
+     return avg;
+ }
++
++/* 지금까지 적재한 센서 값 개수 */
++uint32_t s_push_total = 0u;
++
++/* 센서 값을 적재하고 적재 개수를 센다 (SR-004) */
++void sf_push_counted(int16_t value)
++{
++    sf_push(value);
++    s_push_total++;
++}
