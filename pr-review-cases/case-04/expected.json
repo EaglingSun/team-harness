@@ -1,6 +1,6 @@
 {
   "case": "case-04",
-  "summary": "SR-008 의 개수 조건을 구현하면서 요구사항 번호 주석이 없음",
+  "summary": "코드가 하는 일을 다시 말하기만 하는 주석을 단 새 함수",
   "rule_broken": "CR-04",
   "expected_verdict": "PASS",
   "gate": "G3",
@@ -12,8 +12,8 @@
       "severity": "low",
       "file": "src/sensor_filter.c",
       "lines": [
-        47,
-        50
+        46,
+        57
       ]
     }
   ]

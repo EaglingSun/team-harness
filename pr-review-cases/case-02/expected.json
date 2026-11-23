@@ -1,6 +1,6 @@
 {
   "case": "case-02",
-  "summary": "범위를 확인하지 않는 인덱스로 버퍼를 읽는 새 함수",
+  "summary": "헤더에 선언하지 않은 새 함수를 static 없이 정의",
   "rule_broken": "CR-02",
   "expected_verdict": "FAIL",
   "gate": "G2",
@@ -12,8 +12,8 @@
       "severity": "high",
       "file": "src/sensor_filter.c",
       "lines": [
-        47,
-        50
+        46,
+        58
       ]
     }
   ]

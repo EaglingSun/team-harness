@@ -12,7 +12,7 @@
       "severity": "low",
       "file": "src/speed_monitor.c",
       "lines": [
-        57,
+        56,
         60
       ]
     }

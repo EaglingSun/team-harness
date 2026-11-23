@@ -1,6 +1,6 @@
 {
   "case": "case-05",
-  "summary": "쓰지 않는 매개변수를 표시하지 않은 새 함수",
+  "summary": "이슈 번호 없는 TODO 를 남긴 새 함수",
   "rule_broken": "CR-05",
   "expected_verdict": "PASS",
   "gate": "G3",
@@ -12,8 +12,8 @@
       "severity": "low",
       "file": "src/speed_monitor.c",
       "lines": [
-        57,
-        60
+        56,
+        61
       ]
     }
   ]

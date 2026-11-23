@@ -1,6 +1,6 @@
 {
   "case": "case-03",
-  "summary": "헤더에 extern 전역 변수를 선언",
+  "summary": "헤더의 다른 함수와 접두사가 다른 이름으로 새 공개 함수를 선언",
   "rule_broken": "CR-03",
   "expected_verdict": "PASS",
   "gate": "G3",
@@ -9,18 +9,18 @@
   "findings": [
     {
       "rule": "CR-03",
-      "severity": "medium",
+      "severity": "low",
       "file": "include/speed_monitor.h",
       "lines": [
-        18,
+        17,
         18
       ],
       "also": [
         {
           "file": "src/speed_monitor.c",
           "lines": [
-            57,
-            57
+            56,
+            60
           ]
         }
       ]

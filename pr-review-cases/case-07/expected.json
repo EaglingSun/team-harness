@@ -1,18 +1,18 @@
 {
   "case": "case-07",
-  "summary": "(예비) extern 없이 .c 파일 범위에 static 이 아닌 모듈 상태를 둠",
-  "rule_broken": "CR-03",
-  "expected_verdict": "PASS",
-  "gate": "G3",
+  "summary": "(Held-out) 헤더에 선언하지 않은 파일 범위 변수를 static 없이 둠 — 이름은 s_ 로 시작",
+  "rule_broken": "CR-02",
+  "expected_verdict": "FAIL",
+  "gate": "G2",
   "spare": true,
   "base": "예제 코드 템플릿 main + 요구사항 v2",
   "findings": [
     {
-      "rule": "CR-03",
-      "severity": "medium",
+      "rule": "CR-02",
+      "severity": "high",
       "file": "src/sensor_filter.c",
       "lines": [
-        47,
+        46,
         47
       ],
       "also": [

@@ -1,26 +1,33 @@
 diff --git a/include/sensor_filter.h b/include/sensor_filter.h
-index a8a0407..f3daea1 100644
+index a8a0407..4ce7a63 100644
 --- a/include/sensor_filter.h
 +++ b/include/sensor_filter.h
 @@ -14,4 +14,7 @@ void sf_push(int16_t value);
  /* 가장 최근 적재된 값을 반환한다 */
  int16_t sf_latest(void);
  
-+/* 평균을 구할 수 있는 샘플 개수인지 알려 준다 */
-+bool sf_count_ok(uint8_t count);
++/* 링 버퍼를 비운다 */
++void sf_clear(void);
 +
  #endif /* VSM_SENSOR_FILTER_H */
 diff --git a/src/sensor_filter.c b/src/sensor_filter.c
-index 479d882..cea494b 100644
+index 479d882..df0a558 100644
 --- a/src/sensor_filter.c
 +++ b/src/sensor_filter.c
-@@ -42,3 +42,9 @@ int16_t sf_average(const int16_t *samples, uint8_t count)
+@@ -42,3 +42,16 @@ int16_t sf_average(const int16_t *samples, uint8_t count)
  
      return avg;
  }
 +
-+/* 평균을 구할 수 있는 샘플 개수인지 알려 준다 */
-+bool sf_count_ok(uint8_t count)
++/* 링 버퍼를 비운다 */
++void sf_clear(void)
 +{
-+    return (count >= 1u) && (count <= VSM_SAMPLE_MAX);
++    uint8_t i;
++
++    for (i = 0u; i < VSM_SAMPLE_MAX; i++)
++    {
++        s_buffer[i] = 0;
++    }
++
++    s_head = 0u; /* s_head 를 0 으로 한다 */
 +}

@@ -1,32 +1,26 @@
 diff --git a/include/speed_monitor.h b/include/speed_monitor.h
-index 598a7cc..af801dc 100644
+index 598a7cc..60bf3c8 100644
 --- a/include/speed_monitor.h
 +++ b/include/speed_monitor.h
-@@ -14,4 +14,10 @@ void sm_reset(uint16_t ecu_id);
+@@ -14,4 +14,7 @@ void sm_reset(uint16_t ecu_id);
  /* 누적 과속 횟수를 반환한다 */
  uint32_t sm_over_count(void);
  
-+/* 제동 입력 횟수 */
-+extern uint32_t g_vsm_brake_count;
-+
-+/* 제동 입력 횟수를 하나 늘린다 */
-+void sm_count_brake(void);
++/* 과속 판정 기준을 알려 준다 (SR-002) */
++uint16_t SmLimitKph(void);
 +
  #endif /* VSM_SPEED_MONITOR_H */
 diff --git a/src/speed_monitor.c b/src/speed_monitor.c
-index aa35202..ea93515 100644
+index aa35202..06e2fba 100644
 --- a/src/speed_monitor.c
 +++ b/src/speed_monitor.c
-@@ -52,3 +52,12 @@ uint32_t sm_over_count(void)
+@@ -52,3 +52,9 @@ uint32_t sm_over_count(void)
  {
      return s_over_count;
  }
 +
-+/* 제동 입력 횟수 */
-+uint32_t g_vsm_brake_count = 0u;
-+
-+/* 제동 입력 횟수를 하나 늘린다 */
-+void sm_count_brake(void)
++/* 과속 판정 기준을 알려 준다 (SR-002) */
++uint16_t SmLimitKph(void)
 +{
-+    g_vsm_brake_count++;
++    return (uint16_t)VSM_SPEED_LIMIT_KPH;
 +}
