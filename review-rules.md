@@ -8,20 +8,20 @@ PR 검수 Agent 가 PR 의 바뀐 줄을 보고 남기는 결과의 형식과, �
 - PR 의 diff 로 바뀌거나 더해진 줄과 그 줄이 직접 닿는 범위만 본다
 - 바뀐 줄이 하나도 없는 함수의 문제는 지적하지 않는다. 「문제 없음」 같은 확인 메모도 지적으로 넣지 않는다
 - 확실하지 않으면 지적하지 않는다
-- 지적하는 것은 `coding-rules.md` · 프로젝트 규칙 파일 위반과 명백한 결함(0 으로 나누기 · 배열 경계 초과 · 반환값 미확인)이다
+- 지적하는 것은 `coding-rules.md` · 프로젝트 규칙 파일 위반이다. 정적 분석 · 단위 테스트가 잡는 결함(0 으로 나누기 · 배열 경계 초과 · 반환값 미확인)은 지적하지 않는다
 
 ## 2. 결과 형식
 
 Agent 는 JSON 객체 하나만 한 번 출력한다. 설명 문장 · 코드펜스 · 출력 뒤의 정정은 넣지 않는다.
 
 ```json
-{"findings":[{"rule":"CR-02","file":"src/example.c","line":42,"category":"buffer-overflow","severity":"high","message":"인덱스가 배열 크기보다 작은지 확인하지 않고 쓴다"}]}
+{"findings":[{"rule":"CR-02","file":"src/example.c","line":42,"category":"static-scope","severity":"high","message":"example.h 에 선언이 없는 함수 example_scan 을 static 없이 정의했다"}]}
 ```
 
 - 모든 지적에 `rule` · `file` · `line` · `category` · `severity` · `message` 여섯 칸을 쓴다
-- `rule` 은 규칙 번호(`CR-NN` · 프로젝트 규칙 번호)다. 규칙에 없는 명백한 결함이면 `defect` 로 쓴다
+- `rule` 은 규칙 번호(`CR-NN` · 프로젝트 규칙 번호)다
 - `line` 은 변경 후 파일의 줄 번호다
-- `category` · `severity` 는 규칙에 적힌 값을 쓴다. `defect` 는 category 를 `div-by-zero` · `buffer-overflow` · `unchecked-return` · `other` 가운데 하나로, severity 를 `high` · `medium` · `low` 가운데 하나로 Agent 가 고른다
+- `category` · `severity` 는 규칙에 적힌 값을 쓴다
 - 지적이 없으면 `{"findings":[]}`
 
 ## 3. PR 에 남기는 것
