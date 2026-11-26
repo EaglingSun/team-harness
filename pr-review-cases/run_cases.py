@@ -14,13 +14,17 @@
     scripts/ 의 검수 스크립트가 만든 프롬프트가 돈다
 비교
   python run_cases.py --compare <결과 폴더> <결과 폴더> ... [--criteria <통과 기준 파일>]
-  - 사례 × 설정 표 · 지표 · 평균 초 · 합계 USD · 실제 모델 · 적용 후보를 한 표로 낸다
+  - 사례 × 설정 표 · 지표 · 평균 초 · 합계 USD(소수 넷째 자리) · 합계 입력 토큰(그중 캐시 읽기 · 캐시 생성) · 합계 출력 토큰(그중 thinking) · 1M 토큰당 실효 USD(USD ÷ 전체 토큰 — 모델 단가와 토큰 구성이 섞인 값) · 실제 모델 · 적용 후보와 한 줄 결론(A 대비 후보의 비용 차이가 토큰 수에서 오는지 토큰당 실효 비용에서 오는지)을 낸다
+  - 토큰은 result 이벤트 modelUsage 의 모든 모델을 더한 값이다. 입력 토큰 = inputTokens + cacheReadInputTokens +
+    cacheCreationInputTokens · 출력 토큰 = outputTokens(thinking 포함 · thinkingTokens 는 따로 기록만). 키가 하나라도 없는 사례 · 그런 사례가 든 합계 · 옛 결과는 「-」 로 낸다.
+    적용 후보는 지금처럼 USD · 평균 초로 고른다(토큰은 참고 칸)
   - 규칙을 뺀 폴더가 있으면 같은 설정의 규칙 있는 폴더와 사례마다 ATTRIBUTED · NOT_ATTRIBUTED · 계산 안 함
   - 측정 커밋 · 사례 목록 · 기준 표 · Agent 정의 본문(머리 칸 밖)이 다른 폴더를 섞으면 멈춘다
 
 출력(결과 폴더): <사례>.json(지적 JSON — 형식이 맞을 때만) · <사례>.agent.txt(원출력) · <사례>.opened.txt(연 파일)
                 · <사례>.stream.jsonl · compare.txt · summary.json · summary.md
-종료 코드: 0 = 모든 지표 통과 · 1 = 미달 있음 · 2 = 실행 오류 · 기준 표 읽기 실패 · 작업 트리 문제 · 환경 변수
+종료 코드: 0 = 모든 지표 통과 · 1 = 미달 있음 · 2 = 실행 오류 · 기준 표 읽기 실패 · 작업 트리 문제 · 환경 변수 ·
+          modelUsage 에 토큰 키가 하나도 없는 사례(경고를 낸다 — Claude Code 의 키 이름이 바뀌었을 수 있다)
 """
 import argparse
 import concurrent.futures
@@ -53,6 +57,12 @@ SEVERITIES = ("high", "medium", "low")
 RULE_ID = re.compile(r"^[A-Z]{2,}-\d{2,}$")  # CR-01 · 프로젝트 규칙 번호
 MODEL_FAMILIES = ("haiku", "sonnet", "opus", "fable")
 MEASURE_KEYS = ("cannot", "opened", "recall", "false_pos", "heldout")
+# result 이벤트 modelUsage[<실제 모델>] 의 토큰 키(Claude Code 2.1.332 에서 확인) → 기록 이름
+TOKEN_KEYS = (("input_tokens", "inputTokens"), ("cache_read_tokens", "cacheReadInputTokens"),
+              ("cache_creation_tokens", "cacheCreationInputTokens"), ("output_tokens", "outputTokens"),
+              ("thinking_tokens", "thinkingTokens"))
+TOKENS_IN = ("input_tokens", "cache_read_tokens", "cache_creation_tokens")  # 입력 토큰 = 입력 + 캐시 읽기 + 캐시 생성
+TOKENS_OUT = ("output_tokens",)  # 출력 토큰 = outputTokens(thinking 이 이미 들어 있다 — costUSD 역산)
 LABELS = {"cannot": "판정 불가", "opened": "정답 폴더 열람", "recall": "검출률", "false_pos": "오탐", "heldout": "Held-out",
           "rubric_pass": "루브릭 합격률", "agreement": "Judge 일치율", "consistency": "Judge 일관성",
           "judge_errors": "Judge 오류"}
@@ -91,6 +101,73 @@ def git(args, cwd, ok=(0,)):
 
 def sha256_bytes(b):
     return hashlib.sha256(b).hexdigest()
+
+
+def token_sum(values):
+    """값이 모두 숫자일 때만 합. 하나라도 비면(옛 결과 · 키 이름이 바뀐 Claude Code · 한 사례만 빠짐) None —
+    0 으로 채우거나 부분합을 완전한 값처럼 내지 않는다."""
+    vals = list(values)
+    ok = vals and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals)
+    return sum(vals) if ok else None
+
+
+def token_cell(v):
+    return "-" if v is None else str(v)
+
+
+def usd_cell(v):
+    """소수 넷째 자리로 맞춘다 — 0.024 처럼 끝 0 이 빠지면 0.0238 보다 작아 보인다."""
+    return "-" if v is None else "%.4f" % v
+
+
+def run_tokens(r, key):
+    """결과 폴더 하나의 토큰 종류별 합(사례 원값). 한 사례라도 비면 None."""
+    rows = r.get("cases_detail") or []
+    return token_sum(c.get(key) for c in rows) if rows else None
+
+
+def per_million(r):
+    """입력 + 출력 토큰 1M 개당 실효 USD = USD ÷ 전체 토큰. 모델 단가만이 아니라 토큰 구성(캐시 읽기 · 생성 · 출력 비중)도
+    섞인 값이다 — 모델 단가로 읽지 않는다. 토큰이 비면 None."""
+    tin, tout, usd = r.get("tokens_in_total"), r.get("tokens_out_total"), r.get("cost_total_usd")
+    if tin is None or tout is None or usd is None or tin + tout == 0:
+        return None
+    return usd / (tin + tout) * 1e6
+
+
+def ratio_text(a, b):
+    """a → b 를 읽기 쉽게 — 절반 아래로 줄면 약 1/N · 그보다 작게 줄면 N% 감소 · 늘거나 같으면 N.NN배."""
+    if not a or b is None:
+        return "-"
+    if b <= 0:
+        return "0 으로 줄어듦"
+    if b < a:
+        return "약 1/%d" % round(a / b) if a / b >= 2 else "%d%% 감소" % round((1 - b / a) * 100)
+    return "%.2f배" % (b / a)
+
+
+def conclusion(base, best):
+    """한 줄 결론 — 기준(A)과 적용 후보의 비용 차이가 토큰 수에서 오는지, 토큰당 실효 비용(모델 · 토큰 구성)에서 오는지
+    코드로 조립한다. 값이 0 · 비어 있으면 원인을 나누지 않고 숫자만 쓴다."""
+    import math
+    if best is base:
+        return "한 줄 결론: 통과한 설정 가운데 %s (%s) 가 가장 싸다 — 다른 설정으로 바꿔 줄일 비용이 없다" % (base["_L"], base["label"])
+    ua, ub = base.get("cost_total_usd"), best.get("cost_total_usd")
+    head = "한 줄 결론: %s (%s) 는 %s (%s) 보다 USD 가 %s(%s → %s)이고 지표는 %s" % (
+        best["_L"], best["label"], base["_L"], base["label"], ratio_text(ua, ub), usd_cell(ua), usd_cell(ub),
+        "둘 다 통과" if base["_pass"] else "%s 만 통과" % best["_L"])
+    keys = ("tokens_in_total", "tokens_out_total")
+    if any(base.get(k) in (None, 0) or best.get(k) is None for k in keys):
+        return head + " — 토큰 칸이 비어 비용 차이의 원인을 나눌 수 없다"
+    ri, ro = best["tokens_in_total"] / base["tokens_in_total"], best["tokens_out_total"] / base["tokens_out_total"]
+    pa, pb = per_million(base), per_million(best)
+    tok = (best["tokens_in_total"] + best["tokens_out_total"]) / (base["tokens_in_total"] + base["tokens_out_total"])
+    body = " — 토큰은 입력 %.2f배 · 출력 %.2f배" % (ri, ro)
+    if not pa or not pb or tok <= 0:  # USD 가 0(반올림 0.0000 포함)이면 로그 비교를 하지 않는다
+        return head + body + " — USD 가 0 이라 비용 차이의 원인을 나누지 않는다"
+    cause = "토큰당 실효 비용" if abs(math.log(pb / pa)) >= abs(math.log(tok)) else "토큰 수"
+    return head + body + "이고 1M 토큰당 실효 USD 가 %.2f → %.2f 이므로 비용 차이는 주로 %s 차이에서 온다(실효 비용은 모델과 토큰 구성이 섞인 값)" % (
+        pa, pb, cause)
 
 
 def sha256_file(path):
@@ -518,10 +595,16 @@ def measure_one(ctx, case, index):
         targets = tool_targets(tools)
         with open(os.path.join(out, case + ".opened.txt"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write("\n".join(targets) + ("\n" if targets else ""))
-        usage = ((result or {}).get("modelUsage") or {}).get(model or "", {}) if model else {}
+        # 사례 토큰 = modelUsage 의 모든 모델 합(init 모델만 세면 보조 호출 몫이 빠진다 — USD 도 total_cost_usd 전체다)
+        usages = [u for u in ((result or {}).get("modelUsage") or {}).values() if isinstance(u, dict)]
+        tok = {k: token_sum(u.get(src) for u in usages) for k, src in TOKEN_KEYS}
         row.update({"head": head, "claude_rc": rc, "model": model, "cost_usd": (result or {}).get("total_cost_usd"),
                     "num_turns": (result or {}).get("num_turns"), "is_error": (result or {}).get("is_error"),
-                    "output_tokens": usage.get("outputTokens"), "thinking_tokens": usage.get("thinkingTokens"),
+                    "input_tokens": tok["input_tokens"], "cache_read_tokens": tok["cache_read_tokens"],
+                    "cache_creation_tokens": tok["cache_creation_tokens"],
+                    "output_tokens": tok["output_tokens"], "thinking_tokens": tok["thinking_tokens"],
+                    "tokens_in": token_sum(tok[k] for k in TOKENS_IN), "tokens_out": token_sum(tok[k] for k in TOKENS_OUT),
+                    "tokens_missing": result is not None and any(tok[k] is None for k in TOKENS_IN + TOKENS_OUT),
                     "stream_bad_lines": bad, "stderr_tail": se.strip()[-300:], "tools": targets,
                     "opened": opened_answer(targets, ctx["answer_dirname"])})
         if rc != 0 or result is None or (result or {}).get("is_error"):
@@ -641,6 +724,9 @@ def measure(a):
     run_errors = [r["case"] for r in rows if r["error"]]
     failed = [v for v in verdicts if v["verdict"] == "미달"]
     code = 2 if run_errors else (1 if failed else 0)
+    tokens_missing = [r["case"] for r in rows if r.get("tokens_missing")]
+    if tokens_missing:  # 토큰 칸이 조용히 비지 않게 — 기록 문제로 종료 코드 2(판정 · 통과선은 그대로)
+        code = 2
     label = "model=%s" % (front_model or "없음(세션 모델)") + (" · effort=%s" % front_effort if front_effort else "") + \
             (" · %s 뺌" % a.drop_rule if a.drop_rule else "")
     secs = [r["seconds"] for r in rows if isinstance(r.get("seconds"), (int, float))]
@@ -654,6 +740,9 @@ def measure(a):
             "claude_version": claude_version(exe, env), "compare_rc": crc,
             "compare_total": (cout.strip().splitlines() or [""])[-1], "metrics": metrics, "verdicts": verdicts,
             "run_errors": run_errors, "cost_total_usd": round(sum(r.get("cost_usd") or 0 for r in rows), 4),
+            "tokens_in_total": token_sum(r.get("tokens_in") for r in rows),
+            "tokens_out_total": token_sum(r.get("tokens_out") for r in rows),
+            "tokens_missing": tokens_missing,
             "seconds_avg": round(sum(secs) / len(secs), 1) if secs else None,
             "models": sorted({r["model"] for r in rows if r.get("model")}), "exit_code": code, "cases_detail": rows}
     with open(os.path.join(out, "summary.json"), "w", encoding="utf-8", newline="\n") as fh:
@@ -666,19 +755,29 @@ def measure(a):
         md.append("")
     md += ["| 지표 | 값 | 통과선 | 판정 |", "|---|---|---|---|"]
     md += ["| %s | %s | %s | %s |" % (v["label"], "-" if v["value"] is None else v["value"], v["threshold"], v["verdict"]) for v in verdicts]
-    md += ["", "| 사례 | 규칙 | 일치 · 놓침 · 오탐 | 초 | USD | 모델 | 열람 | 오류 |", "|---|---|---|---|---|---|---|---|"]
+    md += ["", "| 사례 | 규칙 | 일치 · 놓침 · 오탐 | 초 | USD | 입력 토큰 | 출력 토큰 | 모델 | 열람 | 오류 |",
+           "|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
-        md.append("| %s | %s | %s | %s | %s | %s | %s | %s |" % (
+        md.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
             r["case"], r["rule"] or "없음", "판정 불가" if r["cannot"] else "%d · %d · %d" % (r["match"], r["missed"], r["false_pos"]),
-            r.get("seconds"), "-" if r.get("cost_usd") is None else round(r["cost_usd"], 4), r.get("model"), "열람" if r["opened"] else "-",
+            r.get("seconds"), "-" if r.get("cost_usd") is None else round(r["cost_usd"], 4),
+            token_cell(r.get("tokens_in")), token_cell(r.get("tokens_out")), r.get("model"), "열람" if r["opened"] else "-",
             r["error"] or r.get("format_error") or "-"))
+    if tokens_missing:
+        md += ["", "- 경고: 토큰 키(%s) 가운데 입력 · 출력에 쓰는 키가 modelUsage 에 없다(일부 또는 전부 — 그 사례 토큰 칸은 -) — Claude Code 의 키 이름이 바뀌었을 수 있다: %s"
+               % (", ".join(src for _, src in TOKEN_KEYS), ", ".join(tokens_missing))]
     md += ["", "- 설정마다 한 번 잰 값이다. 통과선 바로 위거나 판정 불가 하나(형식 위반)로 미달이면 그 설정만 한 번 더 잰다", ""]
     with open(os.path.join(out, "summary.md"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(md))
     print(cout.rstrip())
     for v in verdicts:
         print("%s %s — 값 %s · 통과선 %s" % (v["verdict"], v["label"], "-" if v["value"] is None else v["value"], v["threshold"]))
-    print("비용 합 %s USD · 평균 %s초 · 결과 %s · 종료 코드 %d" % (summ["cost_total_usd"], summ["seconds_avg"], out, code))
+    if tokens_missing:
+        print("경고: 토큰 키(%s) 가운데 입력 · 출력에 쓰는 키가 modelUsage 에 없다(일부 또는 전부 — 그 사례 토큰 칸은 -) — Claude Code 의 키 이름이 바뀌었을 수 있다. 사례: %s · 종료 코드 2"
+              % (", ".join(src for _, src in TOKEN_KEYS), ", ".join(tokens_missing)))
+    print("비용 합 %s USD · 평균 %s초 · 합계 입력 토큰 %s · 합계 출력 토큰 %s · 결과 %s · 종료 코드 %d" % (
+        summ["cost_total_usd"], summ["seconds_avg"], token_cell(summ["tokens_in_total"]), token_cell(summ["tokens_out_total"]),
+        out, code))
     return code
 
 
@@ -744,7 +843,15 @@ def compare_runs(dirs, out=None):
             vals.append("-" if v["value"] is None else "%s %s" % (v["value"], v["verdict"]))
         lines.append("| %s | %s | %s |" % (v0["label"], v0["threshold"], " | ".join(vals)))
     lines.append("| 평균 초 | | %s |" % " | ".join(str(r.get("seconds_avg")) for r in runs))
-    lines.append("| 합계 USD | | %s |" % " | ".join(str(r.get("cost_total_usd")) for r in runs))
+    lines.append("| 합계 USD | | %s |" % " | ".join(usd_cell(r.get("cost_total_usd")) for r in runs))
+    # 어떤 토큰이 비용을 만드는지 보이게 종류별 줄 · 토큰당 실효 비용이 보이게 1M 토큰당 실효 USD(실장 11/26)
+    lines.append("| 합계 입력 토큰 | | %s |" % " | ".join(token_cell(r.get("tokens_in_total")) for r in runs))  # 옛 결과는 -
+    for key, name in (("cache_read_tokens", "캐시 읽기"), ("cache_creation_tokens", "캐시 생성")):
+        lines.append("| · 그중 %s | | %s |" % (name, " | ".join(token_cell(run_tokens(r, key)) for r in runs)))
+    lines.append("| 합계 출력 토큰 | | %s |" % " | ".join(token_cell(r.get("tokens_out_total")) for r in runs))
+    lines.append("| · 그중 thinking | | %s |" % " | ".join(token_cell(run_tokens(r, "thinking_tokens")) for r in runs))
+    lines.append("| 1M 토큰당 실효 USD | | %s |" % " | ".join(
+        "-" if per_million(r) is None else "%.2f" % per_million(r) for r in runs))
     lines.append("| 실제 모델 | | %s |" % " | ".join(", ".join(r.get("models") or []) for r in runs))
     lines.append("| 통과 | | %s |" % " | ".join("통과" if r["_pass"] else ("실행 오류" if r.get("run_errors") else "미달") for r in runs))
     cands = [r for r in runs if r["_pass"] and not r.get("drop_rule")]
@@ -753,6 +860,7 @@ def compare_runs(dirs, out=None):
         best = sorted(cands, key=lambda r: (r.get("cost_total_usd") or 0, r.get("seconds_avg") or 0))[0]
         lines.append("적용 후보: %s (%s) — 통과선을 모두 넘는 설정 가운데 비용이 가장 낮다(같으면 평균 초가 짧은 것). 고르는 사람은 나다"
                      % (best["_L"], best["label"]))
+        lines.append(conclusion(runs[0], best))
     else:
         lines.append("적용 후보: 없음 — 통과선을 모두 넘은 설정이 없다. 「미달이면」 순서로 원인을 찾는다")
     lines.append("- 설정마다 한 번 잰 값이다. 통과선 바로 위(놓침 · 오탐 한 건 차이)거나 판정 불가 하나(형식 위반)로 미달이면 그 설정만 한 번 더 잰다")

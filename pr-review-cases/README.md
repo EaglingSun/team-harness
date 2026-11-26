@@ -29,9 +29,10 @@ PR 검수 Agent 가 팀 코딩 규칙(`coding-rules.md` CR-01 ~ 05)대로 지적
 | 채점자 확인 | `python judge.py practice --rubric rubric-v0.md --out <폴더>` → 같은 명령을 `rubric.md` 로 |
 | 루브릭 채점 | `python judge.py actual --rubric rubric.md --findings <측정 결과 폴더> --practice-result <채점자 확인 폴더> --out <폴더>` |
 
-- `run_cases.py` 출력: `summary.md`(지표 표 · 사례별 결과) · `summary.json` · `compare.txt` · 사례마다 지적 JSON · Agent 원출력 · 연 파일. `--compare` 는 사례 × 설정 표 · 지표 · 평균 초 · 합계 USD · 실제 모델 · 적용 후보와, 규칙을 뺀 결과가 있으면 사례마다 ATTRIBUTED · NOT_ATTRIBUTED 를 낸다
+- `run_cases.py` 출력: `summary.md`(지표 표 · 사례별 결과) · `summary.json` · `compare.txt` · 사례마다 지적 JSON · Agent 원출력 · 연 파일. `--compare` 는 사례 × 설정 표 · 지표 · 평균 초 · 합계 USD(소수 넷째 자리) · 합계 입력 토큰(그중 캐시 읽기 · 캐시 생성) · 합계 출력 토큰(그중 thinking) · 1M 토큰당 실효 USD(USD ÷ 전체 토큰 — 모델 단가와 토큰 구성이 섞인 값) · 실제 모델 · 적용 후보 · 한 줄 결론(첫 폴더 A 대비 후보의 비용 차이가 토큰 수에서 오는지 토큰당 실효 비용에서 오는지)과, 규칙을 뺀 결과가 있으면 사례마다 ATTRIBUTED · NOT_ATTRIBUTED 를 낸다
+- 토큰 칸: 사례 표의 USD 뒤에 `입력 토큰` · `출력 토큰` 이 있다. Claude Code 가 낸 `modelUsage` 의 모든 모델을 더한 값으로, 입력 토큰 = 입력 + 캐시 읽기 + 캐시 생성(`inputTokens` · `cacheReadInputTokens` · `cacheCreationInputTokens`), 출력 토큰 = `outputTokens` 이다(thinking 이 이미 들어 있어 `thinkingTokens` 를 더하지 않는다). 키가 하나라도 없는 사례와 그 사례가 든 합계, 토큰 칸이 없던 때의 결과 폴더는 `-` 다. 적용 후보는 지금처럼 비용(USD) · 평균 초로 고른다
 - `judge.py` 출력: `judge-<루브릭 이름>.md` · `.json`(일치율 · 일관성 · 「늘 합격」 비교값 · 갈린 칸 · 쌍 표 / 루브릭 합격률). 칸마다 바로 저장하므로 한도 · 시간 초과로 멈추면 `--resume` 으로 남은 칸만 다시 부른다
-- 종료 코드(측정 · 채점 — 두 스크립트 같음): 0 = 모든 지표 통과 · 1 = 미달 있음 · 2 = 실행 오류 · 기준 표를 읽지 못함. `--compare` 는 표를 만들면 0 이다 — 설정마다 통과 여부는 표에서 읽는다
+- 종료 코드(측정 · 채점 — 두 스크립트 같음): 0 = 모든 지표 통과 · 1 = 미달 있음 · 2 = 실행 오류 · 기준 표를 읽지 못함(측정은 토큰 키가 일부라도 없는 사례가 있을 때도 경고와 함께 2). `--compare` 는 표를 만들면 0 이다 — 설정마다 통과 여부는 표에서 읽는다
 - 측정은 한 번에 하나씩 한다. 같은 저장소에서 측정 둘을 겹쳐 돌리면 뒤의 것이 멈춘다(사례 병렬은 `--jobs`)
 - 측정 프롬프트는 `run_cases.py` 가 고정한다 — 모든 설정을 같은 프롬프트로 잰다. PR 검수 Gate 에서는 `scripts/` 의 검수 스크립트가 만든 프롬프트가 돈다. 그래서 측정 결과와 Gate 결과가 다를 수 있다
 
